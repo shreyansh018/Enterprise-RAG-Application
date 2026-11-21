@@ -61,3 +61,5 @@ tenvv
 
 # Logs
 *.log
+.vercel
+.env*
