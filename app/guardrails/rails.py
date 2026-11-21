@@ -1,4 +1,12 @@
+import os
 import threading
+
+# NeMo's semantic intent matching uses fastembed, which downloads an ONNX model.
+# Vercel's filesystem is read-only except /tmp — point all HF/fastembed caches
+# there so the model downloads on first use instead of retrying for ~39s.
+os.environ.setdefault("FASTEMBED_CACHE_PATH", "/tmp/fastembed")
+os.environ.setdefault("HF_HOME", "/tmp/huggingface")
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 import logfire
 from langchain_groq import ChatGroq

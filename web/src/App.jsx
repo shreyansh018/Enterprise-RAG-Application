@@ -2,11 +2,76 @@ import { useEffect, useRef, useState } from 'react'
 
 const API_URL = '/api/query'
 
+const AI_AVATAR = '🤖'
+const USER_AVATAR = '👤'
+
 function newSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function StatusExpander({ loading, steps }) {
+  const [open, setOpen] = useState(true)
+
+  useEffect(() => {
+    if (!loading) setOpen(false)
+  }, [loading])
+
+  return (
+    <div className="st-status">
+      <button type="button" className="st-status-header" onClick={() => setOpen(!open)}>
+        <span className="chevron">{open ? '▾' : '▸'}</span>
+        {loading ? '🔍 Agent is thinking...' : '✅ Answer Synthesized'}
+      </button>
+      {open && (
+        <div className="st-status-body">
+          {steps.map((step, i) => (
+            <div key={i}>⚙️ {step}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SourcesExpander({ sources }) {
+  if (!sources || sources.length === 0) {
+    return <div className="st-caption">ℹ️ No context retrieved — conversational response.</div>
+  }
+  return (
+    <details className="st-expander">
+      <summary>📄 Retrieved Context ({sources.length} chunks)</summary>
+      <div className="st-expander-body">
+        {sources.map((source, i) => {
+          const preview = String(source).replace(/\n/g, ' ').slice(0, 100) + '...'
+          return (
+            <details className="st-expander nested" key={i}>
+              <summary>Chunk {i + 1}: {preview}</summary>
+              <div className="st-info">{source}</div>
+            </details>
+          )
+        })}
+      </div>
+    </details>
+  )
+}
+
+function ChatMessage({ message }) {
+  return (
+    <div className="st-chat-message">
+      <div className="st-avatar">{message.role === 'assistant' ? AI_AVATAR : USER_AVATAR}</div>
+      <div className="st-chat-content">
+        <div className="st-chat-role">{message.role === 'assistant' ? 'assistant' : 'user'}</div>
+        <div className="st-markdown">{message.content}</div>
+        {message.steps && message.steps.length > 0 && (
+          <StatusExpander steps={message.steps} />
+        )}
+        {message.sources && <SourcesExpander sources={message.sources} />}
+      </div>
+    </div>
+  )
 }
 
 export default function App() {
@@ -20,15 +85,13 @@ export default function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [steps, setSteps] = useState([])
-  const [sources, setSources] = useState([])
-  const [status, setStatus] = useState('')
+  const [pendingSteps, setPendingSteps] = useState([])
   const [error, setError] = useState('')
   const endRef = useRef(null)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading, steps])
+  }, [messages, loading, pendingSteps])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -37,9 +100,7 @@ export default function App() {
 
     setInput('')
     setError('')
-    setSteps([])
-    setSources([])
-    setStatus('')
+    setPendingSteps([])
     setMessages((prev) => [...prev, { role: 'user', content: question }])
     setLoading(true)
 
@@ -49,117 +110,96 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ q: question, thread_id: sessionId }),
       })
-      if (!response.ok) throw new Error(`Request failed (${response.status})`)
+      if (!response.ok) throw new Error(`Backend Error: ${response.status} - ${await response.text()}`)
 
       const data = await response.json()
-      setSteps(Array.isArray(data.thought_process) ? data.thought_process : [])
-      setSources(Array.isArray(data.sources) ? data.sources : [])
-      setStatus(data.status || '')
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.answer || 'No response.' },
-      ])
+      const steps = Array.isArray(data.thought_process) ? data.thought_process : []
+      const sources = Array.isArray(data.sources) ? data.sources : []
+      const answer = data.answer || 'No response.'
+
+      setPendingSteps(steps)
+
+      // Typewriter effect — reveal the answer over ~1.5s regardless of length
+      const placeholderIndex = messages.length + 1
+      setMessages((prev) => [...prev, { role: 'assistant', content: '', steps, sources }])
+      const stepMs = Math.max(2, Math.min(12, Math.floor(1500 / answer.length)))
+      let i = 0
+      await new Promise((resolve) => {
+        const timer = setInterval(() => {
+          i += 5
+          const chunk = answer.slice(0, i) + (i < answer.length ? '▌' : '')
+          setMessages((prev) => {
+            const copy = [...prev]
+            copy[placeholderIndex] = { ...copy[placeholderIndex], content: chunk }
+            return copy
+          })
+          if (i >= answer.length) {
+            clearInterval(timer)
+            setMessages((prev) => {
+              const copy = [...prev]
+              copy[placeholderIndex] = { ...copy[placeholderIndex], content: answer }
+              return copy
+            })
+            resolve()
+          }
+        }, stepMs)
+      })
+      setPendingSteps([])
     } catch (err) {
       setError(err.message || 'Backend Offline.')
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Backend Offline. Please try again.' },
-      ])
     } finally {
       setLoading(false)
     }
   }
 
-  function newChat() {
+  function clearHistory() {
     const id = newSessionId()
     setSessionId(id)
     localStorage.setItem('rag-session-id', id)
     setMessages([])
-    setSteps([])
-    setSources([])
-    setStatus('')
+    setPendingSteps([])
     setError('')
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">🧠 Agent OS</div>
-        <div className="divider" />
-        <div className="side-label">Conversation memory</div>
-        <div className="badge">ID: {sessionId.slice(0, 8)}</div>
-        <button type="button" className="secondary-button" onClick={newChat}>
-          🗑️ New chat
+    <div className="st-app">
+      <aside className="st-sidebar">
+        <h1 className="st-sidebar-title">🧠 Agent OS</h1>
+        <hr className="st-divider" />
+        <div className="st-success">Logfire: Connected &amp; Tracing</div>
+        <div className="st-info-box">Memory ID: {sessionId.slice(0, 8)}</div>
+        <button type="button" className="st-primary-button" onClick={clearHistory}>
+          🗑️ Clear History &amp; Memory
         </button>
-        <div className="side-note">
-          Retrieval, guardrails and reasoning are logged to Logfire and LangSmith.
-        </div>
       </aside>
 
-      <main className="main">
-        <header className="header">
-          <h1>🤖 Enterprise Agentic Assistant</h1>
-          <p>Ask about your technical documentation.</p>
-        </header>
+      <main className="st-main">
+        <h1 className="st-title">🤖 Enterprise Agentic Assistant</h1>
 
-        <section className="chat" aria-live="polite">
+        <div className="st-chat-area">
           {messages.length === 0 && !loading && (
-            <div className="empty-state">
-              <div className="empty-icon">💬</div>
-              <div>Ask about Kubernetes, Intel hardware or enterprise networking.</div>
-            </div>
+            <div className="st-empty">Ask about your documentation...</div>
           )}
 
           {messages.map((message, index) => (
-            <div key={index} className={`message ${message.role}`}>
-              <div className="avatar">
-                {message.role === 'assistant' ? '🤖' : '👤'}
-              </div>
-              <div className="bubble">{message.content}</div>
-            </div>
+            <ChatMessage key={index} message={message} />
           ))}
 
           {loading && (
-            <div className="message assistant">
-              <div className="avatar">🤖</div>
-              <div className="bubble thinking">
-                <span className="spinner" /> Agent is thinking…
+            <div className="st-chat-message">
+              <div className="st-avatar">{AI_AVATAR}</div>
+              <div className="st-chat-content">
+                <div className="st-chat-role">assistant</div>
+                <StatusExpander loading steps={pendingSteps} />
               </div>
             </div>
           )}
 
-          {!loading && steps.length > 0 && (
-            <div className="panel">
-              <div className="panel-title">⚙️ Reasoning steps</div>
-              <ol>
-                {steps.map((step, index) => (
-                  <li key={index}>{step}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {!loading && status && (
-            <div className="status-line">Status: {status}</div>
-          )}
-
-          {!loading && sources.length > 0 && (
-            <details className="panel sources" open>
-              <summary>📄 Retrieved context ({sources.length} chunks)</summary>
-              {sources.map((source, index) => (
-                <details key={index} className="source">
-                  <summary>Chunk {index + 1}: {String(source).slice(0, 90)}…</summary>
-                  <pre>{source}</pre>
-                </details>
-              ))}
-            </details>
-          )}
-
-          {error && <div className="error">{error}</div>}
+          {error && <div className="st-error">{error}</div>}
           <div ref={endRef} />
-        </section>
+        </div>
 
-        <form className="composer" onSubmit={handleSubmit}>
+        <form className="st-composer" onSubmit={handleSubmit}>
           <input
             type="text"
             value={input}
@@ -168,9 +208,7 @@ export default function App() {
             aria-label="Question"
             disabled={loading}
           />
-          <button type="submit" disabled={loading || !input.trim()}>
-            {loading ? '…' : 'Send'}
-          </button>
+          <button type="submit" disabled={loading || !input.trim()}>Send</button>
         </form>
       </main>
     </div>
