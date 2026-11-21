@@ -149,6 +149,37 @@ streamlit run evals/app.py
 
 ---
 
+## Vercel Deployment
+
+The repo deploys as one Vercel project with two Services defined in `vercel.json`:
+
+| Service | Root | Purpose | Public route |
+| :--- | :--- | :--- | :--- |
+| `web` | `web/` | Vite + React chat UI | `/` |
+| `api` | repository root | FastAPI backend (`app.main:app`) | `/api/*` |
+
+### Setup
+
+1. Push `main` to GitHub and import the repository into Vercel. Services and rewrites are read from `vercel.json`.
+2. Add these environment variables to the Production and Preview environments:
+   `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKEY_API_KEY`, `PORTKEY_CONFIG_SLUG`,
+   `GEMINI_API_KEY`, `QDRANT_API_KEY`, `QDRANT_CLUSTER_ENDPOINT`, `LOGFIRE_TOKEN`,
+   `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_ENDPOINT`.
+3. Populate Qdrant **before** deploying — ingestion is an offline step because Vercel's filesystem is read-only outside `/tmp`:
+   ```powershell
+   python -m app.ingestion.processor DATA --wipe
+   ```
+4. Deploy and smoke test `GET /api/` and `POST /api/query`.
+
+### Notes
+
+- `requirements.txt` contains Vercel runtime dependencies only. Local/eval tooling (Streamlit, RAGAS, torch) stays in `requirements-local.txt`.
+- Guardrails are initialized lazily on the first `/api/query` call to keep cold starts fast.
+- Conversation memory still uses in-process `MemorySaver`, so history may reset between cold starts or instances.
+- The old Streamlit UI remains in `ui/` for local use.
+
+---
+
 ## Documentation Index
 
 | #   | Guide                                                     | What it covers                               |

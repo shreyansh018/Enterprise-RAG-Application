@@ -12,7 +12,7 @@ logfire.configure(token=os.getenv("LOGFIRE_TOKEN"))
 # Now safe to import app modules - logfire is already active
 from fastapi import FastAPI, Response
 from app.agents.graph import rag_agent
-from app.guardrails import initialize_rails, guard
+from app.guardrails import guard
 
 from pydantic import BaseModel
 from typing import Optional
@@ -21,10 +21,6 @@ from typing import Optional
 # Initialize FastAPI
 app = FastAPI(title="Enterprise Agentic RAG API")
 
-
-@app.on_event("startup")
-def startup_event():
-    initialize_rails()
 
 class QueryRequest(BaseModel):
     q: str
@@ -120,4 +116,11 @@ def query(request: QueryRequest):
             "status": "error",
             "sources": []
         }
+
+
+# Vercel Services keeps the original /api prefix when routing to this service.
+# Register the same handlers there without duplicating OpenAPI operations.
+app.add_api_route("/api/", home, methods=["GET"], include_in_schema=False)
+app.add_api_route("/api/graph", get_graph_image, methods=["GET"], include_in_schema=False)
+app.add_api_route("/api/query", query, methods=["POST"], include_in_schema=False)
 

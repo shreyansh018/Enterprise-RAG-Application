@@ -1,3 +1,6 @@
+# Node / frontend
+node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -26,6 +29,9 @@ wheels/
 
 # Environment variables
 .env
+
+# Vercel
+.vercel/
 
 # Local Vector Store
 index.faiss

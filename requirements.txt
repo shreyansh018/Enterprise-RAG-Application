@@ -1,61 +1,40 @@
 # ==============================================================================
-# ENTERPRISE AGENTIC RAG - REQUIREMENTS (Local, No GCP)
+# VERCEL RUNTIME REQUIREMENTS — FastAPI backend only
+# Dev/eval tooling (streamlit, ragas, deepeval, torch, notebooks) lives in
+# requirements-local.txt and is deliberately excluded from the Vercel bundle.
+# Pinned to versions verified in the project's local venv (Python 3.11 -> 3.12).
 # ==============================================================================
 
-# --- CORE API & WEB FRAMEWORK ---
-fastapi                     # High-performance web framework for the API
-uvicorn[standard]           # ASGI server to run the FastAPI app
-python-dotenv               # For loading configuration from .env files
-requests                    # HTTP library for internal/external API calls
-streamlit                   # Frontend dashboard for the chat interface
-numpy                       # Numerical processing
-pytz                        # Timezone handling for logs
-nest-asyncio                # Support for nested async loops in notebooks/streamlit
+# --- CORE API / CONFIG ---
+fastapi==0.162.0
+python-dotenv==1.2.4
+requests==2.34.2
+pydantic==2.14.1
 
-# --- GEMINI EMBEDDINGS ---
-google-generativeai         # Gemini API — embeddings (text-embedding-004 / gemini-embedding-001)
-langchain-google-genai      # LangChain integration for Gemini models
+# --- LANGCHAIN / LANGGRAPH ---
+langchain==1.4.7
+langgraph==1.2.18
+langchain-groq==1.1.3
+langchain-openai==1.7.3
+langchain-community==0.4.2
+langchain-nvidia-ai-endpoints==1.5.0
 
-# --- VECTOR DB & RETRIEVAL ---
-qdrant-client               # Vector Database for semantic search
-flashrank                   # Ultra-fast local cross-encoder for semantic reranking
+# --- EMBEDDINGS (GEMINI) ---
+langchain-google-genai==4.4.2
+google-genai==2.33.0
+# Shim required by NeMo Guardrails' internal imports (no GCP credentials needed)
+langchain-google-vertexai==3.2.5
 
-# --- LANGCHAIN & AGENTIC ORCHESTRATION ---
-langchain                   # Core LLM orchestration
-langgraph                   # State-machine logic for cyclic agent flows
-langchain-groq              # Integration for lightning-fast Llama 3.3 models
-langchain-google-vertexai   # Required shim for NeMo Guardrails internal import (no GCP credentials needed)
-langchain-community         # Community-contributed tools and loaders
-langchain-openai            # OpenAI-compatible layer (used by Portkey gateway)
-pydantic>=2.0.0             # Data validation and settings management
-
-# --- DATA INGESTION & DOCUMENT PARSING ---
-unstructured                # Base library for DOCX/PPTX partitioning
-python-pptx                 # Parser for PowerPoint files
-python-docx                 # Parser for Word documents
-pypdf                       # Local PDF text extraction (replaces Document AI)
-beautifulsoup4              # High-speed HTML text extraction
-pdfplumber                  # Fallback PDF parser for scanned/complex layouts
-
-# --- OBSERVABILITY & DISTRIBUTED TRACING ---
-langsmith                   # Specialized tracing for LangChain/LangGraph
-logfire[fastapi,requests]   # Pydantic Logfire — FastAPI + requests instrumentation
-loguru                      # Enhanced logging for Python
-
-# --- GUARDRAILS ---
-nemoguardrails              # NVIDIA NeMo Guardrails for input/output safety rails
-langchain-nvidia-ai-endpoints # LangChain integration with NVIDIA AI Endpoints
+# --- VECTOR DB + LOCAL RERANKER ---
+qdrant-client==1.20.0
+FlashRank==0.2.10
 
 # --- LLM GATEWAY ---
-portkey-ai                  # Portkey Gateway for unified LLM routing, fallbacks & observability
+portkey-ai==2.3.4
 
-# --- EVALUATION (EVALS) ---
-ragas                       # RAG-specific evaluation metrics (Faithfulness, Relevancy, Recall)
-deepeval                    # Pytest-compatible test runner wrapping RAGAS & safety metrics
-langfuse                    # Live production monitoring, tracing & user feedback collection
+# --- GUARDRAILS ---
+nemoguardrails==0.24.1
 
-# --- EMBEDDINGS (SENTENCE TRANSFORMERS) ---
-sentence-transformers       # Used by FlashRank reranker internally
-langchain_google_genai
-
-langchain-google-vertexai
+# --- OBSERVABILITY ---
+langsmith==0.14.13
+logfire[fastapi,requests]==5.4.0

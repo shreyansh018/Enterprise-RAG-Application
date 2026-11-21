@@ -1,0 +1,13 @@
+.venv
+**/.venv
+node_modules
+**/node_modules
+web/dist
+.git
+DATA
+processed_data
+notebooks
+DOCS
+evals
+ui
+*.log

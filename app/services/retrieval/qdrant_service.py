@@ -8,7 +8,9 @@ from app.services.retrieval.embedding import embed_query
 # Initialize Qdrant Client
 client = QdrantClient(
     url=settings.QDRANT_URL,
-    api_key=settings.QDRANT_API_KEY
+    api_key=settings.QDRANT_API_KEY,
+    # Avoid a network round-trip on every cold start in serverless environments.
+    check_compatibility=False,
 )
 
 def search_enterprise_knowledge(query: str, limit: int = 8):

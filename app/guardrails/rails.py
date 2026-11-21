@@ -1,3 +1,5 @@
+import threading
+
 import logfire
 from langchain_groq import ChatGroq
 from nemoguardrails import RailsConfig, LLMRails
@@ -7,6 +9,7 @@ from app.guardrails.colang_rules import COLANG_CONTENT, YAML_CONTENT, RAIL_INDIC
 
 
 _rails: LLMRails | None = None
+_rails_lock = threading.Lock()
 
 
 def initialize_rails() -> None:
@@ -34,6 +37,15 @@ def initialize_rails() -> None:
     
 
 
+def ensure_rails() -> None:
+    """Build the rails singleton on first use (serverless-friendly lazy init)."""
+    global _rails
+    if _rails is None:
+        with _rails_lock:
+            if _rails is None:
+                initialize_rails()
+
+
 def guard(message: str) -> tuple[bool, str | None]:
     """
     Run a user message through the NeMo rails gate.
@@ -43,6 +55,7 @@ def guard(message: str) -> tuple[bool, str | None]:
                                 skip the RAG pipeline entirely.
         (False, None)          — message is clean; proceed to LangGraph.
     """
+    ensure_rails()
     if _rails is None:
         logfire.warning("⚠️ Guardrails not initialised — skipping gate.")
         return False, None
