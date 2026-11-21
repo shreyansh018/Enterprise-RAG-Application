@@ -15,7 +15,7 @@ def _get_ranker() -> Ranker:
     if _ranker is None:
         logfire.info("🧠 Initializing FlashRank Model (TinyBERT) locally...")
         try:
-            # We use a specific cache directory to avoid permission issues in production
+            # Bundled model is seeded into /tmp at startup (see app.guardrails.rails)
             _ranker = Ranker(cache_dir="/tmp/flashrank")
         except Exception:
             _ranker = Ranker()
